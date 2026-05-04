@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+.DS_Store
+*.log
+npm-debug.log*
+
+.env
+.env.local
+.npmrc
+
+.vscode/
+.idea/
+.claude/
+
+# Internal planning, never published
+ROADMAP.md
+CLAUDE.md
+NOTES.md
+TODO.md

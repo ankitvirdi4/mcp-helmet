@@ -1,0 +1,78 @@
+{
+  "name": "@ankitvirdi4/mcp-toolkit",
+  "version": "0.1.0-alpha.0",
+  "description": "Production middleware for MCP servers. Auto transport, content wrapping, health checks, graceful shutdown, auth, sessions. Wraps the official Model Context Protocol SDK.",
+  "license": "MIT",
+  "author": "Ankit Virdi <ankitvirdi4@gmail.com> (https://github.com/ankitvirdi4)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ankitvirdi4/mcp-toolkit.git"
+  },
+  "homepage": "https://github.com/ankitvirdi4/mcp-toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/ankitvirdi4/mcp-toolkit/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "middleware",
+    "anthropic",
+    "claude",
+    "llm",
+    "ai",
+    "agent",
+    "tool-calling",
+    "server",
+    "typescript"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": ">=3.22.0",
+    "zod-to-json-schema": ">=3.20.0"
+  },
+  "peerDependenciesMeta": {
+    "zod-to-json-schema": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.23.0"
+  }
+}
