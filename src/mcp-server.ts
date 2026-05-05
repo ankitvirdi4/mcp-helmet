@@ -5,8 +5,9 @@
 // composable middleware system. Delegates protocol logic to the SDK.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { runWithAuthContext } from "./auth-context.js";
 import { wrapToolReturn } from "./content.js";
-import type { Middleware, SetupCleanup } from "./middleware.js";
+import type { HttpRequestContext, Middleware, SetupCleanup } from "./middleware.js";
 import { resolveTransport } from "./transport.js";
 import type {
   ContentItem,
@@ -42,9 +43,15 @@ export interface ToolkitServer {
   use(middleware: Middleware): void;
 
   // Connect to the resolved transport and start listening. Returns a stop()
-  // handle that cleans up middleware, drains in-flight requests, and closes
-  // the transport.
-  start(opts?: StartOptions): Promise<{ stop: () => Promise<void> }>;
+  // handle, plus the resolved transport, port, and host. When port 0 is
+  // requested, `port` is the actual OS-assigned port. For stdio, port and
+  // host are null.
+  start(opts?: StartOptions): Promise<{
+    stop: () => Promise<void>;
+    transport: "stdio" | "http";
+    port: number | null;
+    host: string | null;
+  }>;
 }
 
 export function createServer(opts: CreateServerOptions): ToolkitServer {
@@ -110,6 +117,8 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
       }
 
       let stopTransport: () => Promise<void>;
+      let actualPort: number | null = null;
+      let actualHost: string | null = null;
 
       if (resolved.transport === "stdio") {
         // stdio mode: middleware `before` hooks do not run because there is
@@ -136,13 +145,23 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
 
         const httpServer = http.createServer(async (req, res) => {
           try {
+            const ctx: HttpRequestContext = { req, res };
             for (const mw of middlewares) {
               if (mw.before) {
-                const result = await mw.before({ req, res });
+                const result = await mw.before(ctx);
                 if (result && result.handled) return;
               }
             }
-            await transport.handleRequest(req, res);
+            // Wrap MCP transport handling in AsyncLocalStorage so tool
+            // handlers downstream can read the auth via getAuthContext().
+            // We only pay the wrapper cost when auth was actually set.
+            if (ctx.auth) {
+              await runWithAuthContext(ctx.auth, () =>
+                transport.handleRequest(req, res),
+              );
+            } else {
+              await transport.handleRequest(req, res);
+            }
           } catch (err) {
             if (!res.headersSent) {
               res.statusCode = 500;
@@ -159,6 +178,15 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
         await new Promise<void>((resolve) =>
           httpServer.listen(resolved.port, resolved.host, () => resolve()),
         );
+
+        const addr = httpServer.address();
+        if (addr && typeof addr === "object") {
+          actualPort = addr.port;
+          actualHost = addr.address;
+        } else {
+          actualPort = resolved.port;
+          actualHost = resolved.host;
+        }
 
         stopTransport = async () => {
           await new Promise<void>((resolve, reject) =>
@@ -185,7 +213,12 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
         startedAt = null;
       };
 
-      return { stop };
+      return {
+        stop,
+        transport: resolved.transport,
+        port: actualPort,
+        host: actualHost,
+      };
     },
   };
 

@@ -1,11 +1,12 @@
 // Public entry point for mcp-helmet.
 //
-// v0.1.0-alpha.1 — Weekend 2 of 4.
+// v0.1.0-alpha.2 — Weekend 3 of 4.
 // Shipped: createServer, auto content wrapping, auto transport detection,
-// Zod v3/v4 compatibility shim, middleware system, healthCheck() and
-// gracefulShutdown() middleware.
+// Zod v3/v4 compatibility shim, middleware system, healthCheck(),
+// gracefulShutdown(), bearerAuth(), apiKeyAuth(), AsyncLocalStorage-based
+// auth context.
 
-export const VERSION = "0.1.0-alpha.1";
+export const VERSION = "0.1.0-alpha.2";
 
 export { createServer } from "./mcp-server.js";
 export type { ToolHandler, ToolkitServer } from "./mcp-server.js";
@@ -26,6 +27,13 @@ export { healthCheck } from "./middleware/health-check.js";
 export type { HealthCheckOptions } from "./middleware/health-check.js";
 export { gracefulShutdown } from "./middleware/graceful-shutdown.js";
 export type { GracefulShutdownOptions } from "./middleware/graceful-shutdown.js";
+export { bearerAuth } from "./middleware/bearer-auth.js";
+export type { BearerAuthOptions } from "./middleware/bearer-auth.js";
+export { apiKeyAuth } from "./middleware/api-key-auth.js";
+export type { ApiKeyAuthOptions } from "./middleware/api-key-auth.js";
+
+export { getAuthContext, runWithAuthContext } from "./auth-context.js";
+export type { AuthContext } from "./auth-context.js";
 
 export type {
   BeforeHook,

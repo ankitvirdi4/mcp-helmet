@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.2
+
+### Minor Changes
+
+- Weekend 3 of v0.1 ships auth middleware and the AsyncLocalStorage-based auth context, plus a real listening-server integration suite that closes the previous HTTP-path coverage gap.
+
+  ### Added
+
+  - **`bearerAuth({ verify, optional?, realm? })` middleware.** Reads `Authorization: Bearer <token>`, calls the user's verify function, and on success populates `ctx.auth`. On failure, returns `401` with a properly formatted `WWW-Authenticate` header (escaped realm, `error` and `error_description` parameters). The `optional` flag passes unauthenticated requests through with no `ctx.auth`. 12 unit tests.
+  - **`apiKeyAuth({ header?, validate, optional? })` middleware.** Reads a configurable header (default `X-API-Key`, case insensitive). Same accept/reject contract as `bearerAuth`. 10 unit tests.
+  - **AsyncLocalStorage auth context.** `getAuthContext()` returns the verified principal from anywhere inside an async chain — including deep inside tool handlers — without changing the single-arg handler signature. The toolkit's HTTP handler wraps `transport.handleRequest` with `runWithAuthContext` whenever middleware writes `ctx.auth`. Wrapper cost is paid only when auth is present. 6 unit tests.
+  - **Real listening-server tests for `mcp-server.ts`.** New suite binds an HTTP server on port 0, drives it with `fetch` and the SDK's `StreamableHTTPClientTransport`, and verifies: health-check short-circuit, bearer rejection / acceptance, api-key rejection / acceptance, end-to-end auth → `getAuthContext()` propagation inside a tool handler, middleware-throws → 500, and the lifecycle of `setup` / `cleanup` hooks. 11 integration tests.
+  - **Resolved address on `start()` return.** `start()` now returns `{ stop, transport, port, host }`. When `port: 0` is requested, `port` is the OS-assigned ephemeral port. For stdio, `port` and `host` are `null`.
+
+  ### Notes
+
+  - 95 tests total, all green. Coverage now 88% lines overall (up from ~70%); auth and middleware modules at 100%. The remaining `mcp-server.ts` gap is the stdio console-redirect path, which requires subprocess testing — deferred to a later weekend.
+  - The middleware contract intentionally exposes a `ctx.auth` field of type `AuthContext` rather than a separate `setAuth()` method. Custom auth schemes (mTLS client cert, signed cookies, JWKS-validated JWT) follow the same pattern as the shipped `bearerAuth` / `apiKeyAuth`: write `ctx.auth` from `before()`, the toolkit handles the rest.
+
 ## 0.1.0-alpha.1
 
 ### Minor Changes

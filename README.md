@@ -42,6 +42,32 @@ MCP_TRANSPORT=http PORT=3000 node dist/index.js
 
 Same code, both modes.
 
+## Auth in 6 lines
+
+Bearer token verification, with the verified principal available inside any tool handler:
+
+```typescript
+import { createServer, bearerAuth, getAuthContext } from "mcp-helmet";
+
+const server = createServer({ name: "secure", version: "1.0.0" });
+
+server.use(bearerAuth({
+  verify: async (token) => {
+    const claims = await verifyJwt(token); // your call
+    return { user: claims.sub, scopes: claims.scope?.split(" ") ?? [] };
+  },
+}));
+
+server.tool("whoami", {}, async () => {
+  const auth = getAuthContext();
+  return { user: auth?.user, scopes: auth?.scopes };
+});
+
+await server.start();
+```
+
+The single-argument tool handler signature stays the same — `getAuthContext()` reads from AsyncLocalStorage, so it works from any depth in the async chain.
+
 ## Why this exists
 
 We audited 30 production MCP servers and 320 GitHub issues across the official SDKs. Three patterns kept showing up:
@@ -56,18 +82,21 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 
 ## Status
 
-**v0.1.0-alpha — Weekend 1 of 4.** Currently shipped:
+**v0.1.0-alpha — Weekend 3 of 4.** Currently shipped:
 
 - ✅ `createServer()` with auto content wrapping (string, object, Content[])
 - ✅ Auto transport detection via `MCP_TRANSPORT` env var
 - ✅ Zod v3 + v4 compatibility shim
+- ✅ Composable middleware system (`server.use(mw)`)
+- ✅ `healthCheck()` middleware
+- ✅ `gracefulShutdown()` middleware
+- ✅ `bearerAuth()` and `apiKeyAuth()` middleware with AsyncLocalStorage-based `getAuthContext()`
 
-Coming in v0.1.0-alpha.2 through .4:
+Coming in v0.1.0-alpha.4:
 
-- 🚧 `healthCheck()` middleware
-- 🚧 `gracefulShutdown()` middleware
-- 🚧 `bearerAuth()` and `apiKeyAuth()` middleware
 - 🚧 `npx mcp-helmet init` CLI scaffolder
+- 🚧 Session externalisation stopgap
+- 🚧 Docker / deployment templates
 
 ## How it relates to the official SDK
 

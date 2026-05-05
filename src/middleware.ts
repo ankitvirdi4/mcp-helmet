@@ -14,11 +14,16 @@
 //            log transports, anything that needs paired init/teardown.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { AuthContext } from "./auth-context.js";
 import type { ToolkitServer } from "./mcp-server.js";
 
 export interface HttpRequestContext {
   req: IncomingMessage;
   res: ServerResponse;
+  // Auth middleware writes the verified principal here. The toolkit reads
+  // it after the middleware chain runs and wraps `transport.handleRequest`
+  // with `runWithAuthContext` so tool handlers can call `getAuthContext()`.
+  auth?: AuthContext;
 }
 
 export interface BeforeResult {
