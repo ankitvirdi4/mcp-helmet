@@ -5,8 +5,8 @@ Thanks for considering a contribution.
 ## Setup
 
 ```bash
-git clone https://github.com/ankitvirdi4/mcp-toolkit.git
-cd mcp-toolkit
+git clone https://github.com/ankitvirdi4/mcp-helmet.git
+cd mcp-helmet
 npm install
 ```
 

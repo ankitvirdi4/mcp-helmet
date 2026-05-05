@@ -56,7 +56,7 @@ export function zodToJsonSchema(schema: unknown): JsonSchema {
     const z4 = tryRequire<ZodV4Module>("zod/v4") ?? tryRequire<ZodV4Module>("zod");
     if (!z4 || typeof z4.toJSONSchema !== "function") {
       throw new Error(
-        "mcp-toolkit: detected Zod v4 schema but toJSONSchema() not found. " +
+        "mcp-helmet: detected Zod v4 schema but toJSONSchema() not found. " +
           "Ensure 'zod' >=3.25 is installed.",
       );
     }
@@ -68,7 +68,7 @@ export function zodToJsonSchema(schema: unknown): JsonSchema {
     const lib = tryRequire<ZodToJsonSchemaModule>("zod-to-json-schema");
     if (!lib || typeof lib.zodToJsonSchema !== "function") {
       throw new Error(
-        "mcp-toolkit: detected Zod v3 schema but 'zod-to-json-schema' is " +
+        "mcp-helmet: detected Zod v3 schema but 'zod-to-json-schema' is " +
           "not installed. Run: npm install zod-to-json-schema",
       );
     }
@@ -77,7 +77,7 @@ export function zodToJsonSchema(schema: unknown): JsonSchema {
   }
 
   throw new Error(
-    "mcp-toolkit: could not detect Zod version. Expected a Zod v3 " +
+    "mcp-helmet: could not detect Zod version. Expected a Zod v3 " +
       "(._def.typeName) or v4 (._zod.def) schema.",
   );
 }
@@ -92,7 +92,7 @@ export function inputShapeToJsonSchema(
   }
   if (!shape || typeof shape !== "object") {
     throw new Error(
-      "mcp-toolkit: input shape must be a Zod schema or a record of Zod fields",
+      "mcp-helmet: input shape must be a Zod schema or a record of Zod fields",
     );
   }
   // Detect the Zod version of the inner fields so we wrap with the matching
@@ -109,7 +109,7 @@ export function inputShapeToJsonSchema(
 
   if (!z || typeof z.object !== "function") {
     throw new Error(
-      "mcp-toolkit: could not resolve a Zod module matching the shape's field version",
+      "mcp-helmet: could not resolve a Zod module matching the shape's field version",
     );
   }
   return zodToJsonSchema(z.object(shape as Record<string, unknown>));

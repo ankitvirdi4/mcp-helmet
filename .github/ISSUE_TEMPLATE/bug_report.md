@@ -16,7 +16,7 @@ labels: bug
 3.
 
 **Environment**
-- `@ankitvirdi4/mcp-toolkit` version:
+- `mcp-helmet` version:
 - `@modelcontextprotocol/sdk` version:
 - Node version:
 - OS:

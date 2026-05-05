@@ -15,4 +15,4 @@ Initial scaffold. Weekend 1 of 4.
 ### Notes
 
 - Pinned to `@modelcontextprotocol/sdk` ^1.29.0. SDK v2 is in active development; will revisit as v0.2.
-- npm package name is `@ankitvirdi4/mcp-toolkit` because the unscoped `mcp-toolkit` is owned by another author. GitHub repo is `mcp-toolkit`.
+- npm package name is `mcp-helmet` because the unscoped `mcp-helmet` is owned by another author. GitHub repo is `mcp-helmet`.

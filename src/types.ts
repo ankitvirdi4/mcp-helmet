@@ -1,4 +1,4 @@
-// Public types for mcp-toolkit.
+// Public types for mcp-helmet.
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 

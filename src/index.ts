@@ -1,4 +1,4 @@
-// Public entry point for @ankitvirdi4/mcp-toolkit.
+// Public entry point for mcp-helmet.
 //
 // v0.1.0-alpha.0 — Weekend 1 of 4.
 // Shipped: createServer, auto content wrapping, auto transport detection,

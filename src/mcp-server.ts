@@ -161,7 +161,7 @@ function registerToolCompat(
     | undefined;
   if (typeof register !== "function") {
     throw new Error(
-      "mcp-toolkit: underlying McpServer does not expose registerTool() or tool(). " +
+      "mcp-helmet: underlying McpServer does not expose registerTool() or tool(). " +
         "Update @modelcontextprotocol/sdk to >=1.29.",
     );
   }

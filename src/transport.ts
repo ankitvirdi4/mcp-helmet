@@ -17,7 +17,7 @@ export function resolveTransport(opts: StartOptions = {}): ResolvedTransport {
 
   if (transport !== "stdio" && transport !== "http") {
     throw new Error(
-      `mcp-toolkit: unknown transport "${transport}". Expected "stdio" or "http".`,
+      `mcp-helmet: unknown transport "${transport}". Expected "stdio" or "http".`,
     );
   }
 

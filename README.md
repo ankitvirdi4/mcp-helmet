@@ -1,16 +1,16 @@
-# mcp-toolkit
+# mcp-helmet
 
-[![npm](https://img.shields.io/npm/v/@ankitvirdi4/mcp-toolkit.svg)](https://www.npmjs.com/package/@ankitvirdi4/mcp-toolkit)
-[![CI](https://github.com/ankitvirdi4/mcp-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/ankitvirdi4/mcp-toolkit/actions/workflows/ci.yml)
-[![License](https://img.shields.io/npm/l/@ankitvirdi4/mcp-toolkit.svg)](./LICENSE)
-[![Types](https://img.shields.io/npm/types/@ankitvirdi4/mcp-toolkit.svg)](https://www.npmjs.com/package/@ankitvirdi4/mcp-toolkit)
+[![npm](https://img.shields.io/npm/v/mcp-helmet.svg)](https://www.npmjs.com/package/mcp-helmet)
+[![CI](https://github.com/ankitvirdi4/mcp-helmet/actions/workflows/ci.yml/badge.svg)](https://github.com/ankitvirdi4/mcp-helmet/actions/workflows/ci.yml)
+[![License](https://img.shields.io/npm/l/mcp-helmet.svg)](./LICENSE)
+[![Types](https://img.shields.io/npm/types/mcp-helmet.svg)](https://www.npmjs.com/package/mcp-helmet)
 
-> The missing middleware layer for MCP servers. Go from hello world to production in minutes, not days.
+> Production middleware for MCP servers. Auth, sessions, health checks, graceful shutdown, transport ergonomics. Composable middleware borrowed in spirit from Express's `helmet`.
 
-`mcp-toolkit` wraps the official [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) with the things it doesn't ship: auto transport detection, content wrapping, health checks, graceful shutdown, session management, and auth middleware. One package. Composable. Drop what you don't need.
+`mcp-helmet` wraps the official [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) with the things it doesn't ship: auto transport detection, content wrapping, health checks, graceful shutdown, session management, and auth middleware. One package. Composable. Drop what you don't need. Go from hello world to production in minutes, not days.
 
 ```bash
-npm install @ankitvirdi4/mcp-toolkit @modelcontextprotocol/sdk zod
+npm install mcp-helmet @modelcontextprotocol/sdk zod
 ```
 
 > **Peer dependencies:** `@modelcontextprotocol/sdk` ^1.29.0, `zod` ^3.22.0 or ^3.25 (v4). `zod-to-json-schema` is an optional peer for Zod v3 users.
@@ -18,7 +18,7 @@ npm install @ankitvirdi4/mcp-toolkit @modelcontextprotocol/sdk zod
 ## Quickstart
 
 ```typescript
-import { createServer } from "@ankitvirdi4/mcp-toolkit";
+import { createServer } from "mcp-helmet";
 import { z } from "zod";
 
 const server = createServer({ name: "hello", version: "1.0.0" });
@@ -52,7 +52,7 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 
 3. **Nobody can figure out auth.** "How do I access the bearer token inside my tool?" is the most asked question across both SDK repos.
 
-`mcp-toolkit` solves these with composable middleware that extends the SDK without replacing it.
+`mcp-helmet` solves these with composable middleware that extends the SDK without replacing it.
 
 ## Status
 
@@ -67,13 +67,13 @@ Coming in v0.1.0-alpha.2 through .4:
 - 🚧 `healthCheck()` middleware
 - 🚧 `gracefulShutdown()` middleware
 - 🚧 `bearerAuth()` and `apiKeyAuth()` middleware
-- 🚧 `npx mcp-toolkit init` CLI scaffolder
+- 🚧 `npx mcp-helmet init` CLI scaffolder
 
 ## How it relates to the official SDK
 
-`mcp-toolkit` is **not** a fork, an alternative, or a replacement. It's a convenience layer.
+`mcp-helmet` is **not** a fork, an alternative, or a replacement. It's a convenience layer.
 
-| Concern | Official SDK | mcp-toolkit |
+| Concern | Official SDK | mcp-helmet |
 |---|---|---|
 | Protocol implementation | Yes | No, delegates to SDK |
 | Transport classes | Yes | No, wraps SDK transports |
