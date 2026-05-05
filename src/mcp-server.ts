@@ -31,10 +31,13 @@ export interface ToolkitServer {
   readonly info: { name: string; version: string };
 
   // Register a tool with auto content wrapping and Zod-or-shape input.
-  tool(
+  // TInput is inferred from the handler's parameter type, so users can
+  // write `async ({ name }: { name: string }) => ...` and have the
+  // destructured fields typed without separate generic application.
+  tool<TInput = unknown>(
     name: string,
     inputShape: Record<string, unknown> | unknown | undefined,
-    handler: ToolHandler<unknown>,
+    handler: ToolHandler<TInput>,
     description?: string,
   ): void;
 
@@ -74,12 +77,17 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
       return startedAt;
     },
     info: { name: opts.name, version: opts.version },
-    tool(name, inputShape, handler, description) {
+    tool<TInput = unknown>(
+      name: string,
+      inputShape: Record<string, unknown> | unknown | undefined,
+      handler: ToolHandler<TInput>,
+      description?: string,
+    ): void {
       const wrappedHandler = async (
         input: unknown,
       ): Promise<{ content: ContentItem[]; isError?: boolean }> => {
         try {
-          const result = await handler(input);
+          const result = await handler(input as TInput);
           return { content: wrapToolReturn(result as ToolReturn) };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);

@@ -17,6 +17,19 @@ npm install mcp-helmet @modelcontextprotocol/sdk zod
 
 ## Quickstart
 
+The fastest way is the scaffolder:
+
+```bash
+npx mcp-helmet init my-server --transport http --auth bearer
+cd my-server
+npm install
+npm run dev
+```
+
+You get a working MCP server with `healthCheck()`, `gracefulShutdown()`, optional auth, a multistage `Dockerfile`, and a typechecked `tsconfig`. Drop flags to skip pieces (`--no-docker`, `--no-health`, etc.) or customise after the fact.
+
+Or wire it manually:
+
 ```typescript
 import { createServer } from "mcp-helmet";
 import { z } from "zod";
@@ -82,7 +95,7 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 
 ## Status
 
-**v0.1.0-alpha — Weekend 3 of 4.** Currently shipped:
+**v0.1.0-alpha — feature complete.** Currently shipped:
 
 - ✅ `createServer()` with auto content wrapping (string, object, Content[])
 - ✅ Auto transport detection via `MCP_TRANSPORT` env var
@@ -91,12 +104,9 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 - ✅ `healthCheck()` middleware
 - ✅ `gracefulShutdown()` middleware
 - ✅ `bearerAuth()` and `apiKeyAuth()` middleware with AsyncLocalStorage-based `getAuthContext()`
+- ✅ `npx mcp-helmet init` CLI scaffolder + Docker template
 
-Coming in v0.1.0-alpha.4:
-
-- 🚧 `npx mcp-helmet init` CLI scaffolder
-- 🚧 Session externalisation stopgap
-- 🚧 Docker / deployment templates
+v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage. v0.2 is on the [ROADMAP](./CHANGELOG.md): Redis-backed session store, structured logging middleware, Python port via FastMCP plugin.
 
 ## How it relates to the official SDK
 

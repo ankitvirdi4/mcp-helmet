@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0-alpha.3
+
+### Minor Changes
+
+- Weekend 4 ships the `mcp-helmet init` CLI scaffolder, the Docker template, and a generic-inferring `tool()` signature. v0.1 is now feature-complete.
+
+  ### Added
+
+  - **`mcp-helmet init <name>` CLI.** One command produces a working MCP server project with `package.json`, `tsconfig.json`, `src/index.ts`, `README.md`, optional `Dockerfile` + `.dockerignore`, and `.gitignore`. Templates are inlined into the CLI bundle (no glob, no fs reads of package-internal paths). Flags: `--transport <stdio|http|dual>`, `--auth <none|bearer|api-key>`, `--no-docker`, `--no-health`, `--no-shutdown`, `--target-dir <path>`. Defaults are deployment-ready: dual transport, health and shutdown middleware on, Dockerfile included.
+  - **Docker template.** Multistage Node 20-alpine, runs as the unprivileged `node` user, includes `HEALTHCHECK` against `/healthz` for HTTP-capable images, sets `MCP_TRANSPORT=http` for dual-mode images. Stdio-mode images skip the `EXPOSE` and `HEALTHCHECK` directives.
+  - **Generic-inferring `tool()` signature.** `server.tool<TInput>(name, shape, handler)` infers `TInput` from the handler's parameter, so `async ({ name }: { name: string }) => ...` typechecks under `strict: true` in user projects. The toolkit's own tests already used this pattern (vitest doesn't typecheck by default); the scaffolder's `tsc --noEmit` exposed the gap. Closing it improves DX for everyone.
+  - **`src/version.ts`.** Single source of truth for the version constant, imported by both the library entry and the CLI bundle. Lets the CLI build avoid pulling in the rest of the library through the index barrel.
+
+  ### Changed
+
+  - **`package.json` `bin`.** Adds `"mcp-helmet": "./dist/cli.js"` so `npx mcp-helmet init` Just Works once installed.
+  - **tsup config** is now an array with two entries: the library (ESM + CJS + dts) and the CLI (ESM only, with `#!/usr/bin/env node` banner, no dts).
+
+  ### Notes
+
+  - 121 tests, all green. CLI suite covers argv parsing (defaults, enum validation, unknown flags, multi-positional rejection), name validation (npm rules), and renderer output for every flag combination via an in-memory writer.
+  - Scaffold is end-to-end verified: `init smoke --transport http --auth bearer` → `npm install` → `npm run build` → `node dist/index.js` → `/healthz` returns 200, unauthed POST returns 401, MCP `initialize` over `Authorization: Bearer dev-token` succeeds.
+  - v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage and no breaking-change asks.
+
 ## 0.1.0-alpha.2
 
 ### Minor Changes

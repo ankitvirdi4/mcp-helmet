@@ -1,12 +1,12 @@
 // Public entry point for mcp-helmet.
 //
-// v0.1.0-alpha.2 — Weekend 3 of 4.
+// v0.1.0-alpha.3 — Weekend 4 of 4.
 // Shipped: createServer, auto content wrapping, auto transport detection,
 // Zod v3/v4 compatibility shim, middleware system, healthCheck(),
 // gracefulShutdown(), bearerAuth(), apiKeyAuth(), AsyncLocalStorage-based
-// auth context.
+// auth context, `mcp-helmet init` CLI scaffolder + Docker templates.
 
-export const VERSION = "0.1.0-alpha.2";
+export { VERSION } from "./version.js";
 
 export { createServer } from "./mcp-server.js";
 export type { ToolHandler, ToolkitServer } from "./mcp-server.js";
