@@ -20,3 +20,5 @@ ROADMAP.md
 CLAUDE.md
 NOTES.md
 TODO.md
+tsup.config.bundled_*.mjs
+vitest.config.ts.timestamp-*.mjs

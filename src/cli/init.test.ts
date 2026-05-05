@@ -66,6 +66,7 @@ describe("parseInitArgs", () => {
     expect(a.auth).toBe("none");
     expect(a.health).toBe(true);
     expect(a.shutdown).toBe(true);
+    expect(a.rateLimit).toBe(true);
     expect(a.docker).toBe(true);
   });
 
@@ -78,12 +79,14 @@ describe("parseInitArgs", () => {
       "bearer",
       "--no-docker",
       "--no-health",
+      "--no-rate-limit",
     ]);
     expect(a.transport).toBe("http");
     expect(a.auth).toBe("bearer");
     expect(a.docker).toBe(false);
     expect(a.health).toBe(false);
     expect(a.shutdown).toBe(true);
+    expect(a.rateLimit).toBe(false);
   });
 
   it("rejects unknown values for --transport / --auth", () => {
@@ -126,6 +129,8 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+       rateLimit: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -156,6 +161,7 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: false,
       },
       writer,
@@ -174,6 +180,7 @@ describe("runInit", () => {
         auth: "bearer",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -195,6 +202,7 @@ describe("runInit", () => {
         auth: "api-key",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -215,6 +223,7 @@ describe("runInit", () => {
         auth: "none",
         health: false,
         shutdown: false,
+        rateLimit: true,
         docker: false,
       },
       writer,
@@ -222,6 +231,43 @@ describe("runInit", () => {
     const index = writer.files.get("/tmp/demo/src/index.ts")!;
     expect(index).not.toContain("healthCheck");
     expect(index).not.toContain("gracefulShutdown");
+  });
+
+  it("includes rateLimiter wiring by default and omits it when --no-rate-limit", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "http",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        docker: false,
+      },
+      writer,
+    );
+    const onIndex = writer.files.get("/tmp/demo/src/index.ts")!;
+    expect(onIndex).toContain("rateLimiter");
+    expect(onIndex).toContain("server.use(rateLimiter(");
+
+    const writer2 = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/other",
+        transport: "http",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: false,
+        docker: false,
+      },
+      writer2,
+    );
+    const offIndex = writer2.files.get("/tmp/other/src/index.ts")!;
+    expect(offIndex).not.toContain("rateLimiter");
   });
 
   it("renders a stdio-only Dockerfile without EXPOSE / HEALTHCHECK", async () => {
@@ -234,6 +280,7 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -254,6 +301,7 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -275,6 +323,7 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: true,
       },
       writer,
@@ -293,6 +342,7 @@ describe("runInit", () => {
           auth: "none",
           health: true,
           shutdown: true,
+          rateLimit: true,
           docker: true,
         },
         writer,
@@ -311,6 +361,7 @@ describe("runInit", () => {
           auth: "none",
           health: true,
           shutdown: true,
+          rateLimit: true,
           docker: true,
         },
         writer,
@@ -329,6 +380,7 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
+        rateLimit: true,
         docker: false,
       },
       writer,

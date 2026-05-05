@@ -14,6 +14,7 @@ export interface TemplateOptions {
   auth: "none" | "bearer" | "api-key";
   health: boolean;
   shutdown: boolean;
+  rateLimit: boolean;
   docker: boolean;
 }
 
@@ -111,6 +112,7 @@ function renderDockerignore(): string {
 function renderIndexTs(opts: TemplateOptions): string {
   const imports = ["createServer"];
   if (opts.health) imports.push("healthCheck");
+  if (opts.rateLimit) imports.push("rateLimiter");
   if (opts.shutdown) imports.push("gracefulShutdown");
   if (opts.auth === "bearer") imports.push("bearerAuth", "getAuthContext");
   if (opts.auth === "api-key") imports.push("apiKeyAuth", "getAuthContext");
@@ -128,6 +130,13 @@ function renderIndexTs(opts: TemplateOptions): string {
     lines.push("// Liveness/readiness probe at /healthz. Default body returns");
     lines.push("// status, tool count, uptime, and version.");
     lines.push("server.use(healthCheck());");
+    lines.push("");
+  }
+
+  if (opts.rateLimit) {
+    lines.push("// 100 requests per minute per client (default: keyed by remote IP).");
+    lines.push("// Returns 429 + Retry-After when exceeded. No-op for stdio transport.");
+    lines.push("server.use(rateLimiter({ max: 100, windowMs: 60_000 }));");
     lines.push("");
   }
 
@@ -249,6 +258,13 @@ function renderReadme(opts: TemplateOptions): string {
     lines.push("```bash");
     lines.push("curl http://localhost:3000/healthz");
     lines.push("```");
+    lines.push("");
+  }
+
+  if (opts.rateLimit && opts.transport !== "stdio") {
+    lines.push("## Rate limiting");
+    lines.push("");
+    lines.push("Default: 100 requests per minute per client IP. Tune via the `max` and `windowMs` options in `src/index.ts`. Pass a custom `keyFn` to key by API key or authenticated user instead of IP.");
     lines.push("");
   }
 

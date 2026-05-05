@@ -18,6 +18,7 @@ Flags:
   --auth <none|bearer|api-key>    Default: none
   --no-health                     Skip healthCheck() middleware
   --no-shutdown                   Skip gracefulShutdown() middleware
+  --no-rate-limit                 Skip rateLimiter() middleware
   --no-docker                     Skip Dockerfile + .dockerignore
   --target-dir <path>             Where to create the project. Default: ./<name>
 
@@ -79,6 +80,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         auth: parsed.auth,
         health: parsed.health,
         shutdown: parsed.shutdown,
+        rateLimit: parsed.rateLimit,
         docker: parsed.docker,
       },
       fsWriter,

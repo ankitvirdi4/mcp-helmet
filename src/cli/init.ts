@@ -48,6 +48,7 @@ export async function runInit(
     auth: opts.auth,
     health: opts.health,
     shutdown: opts.shutdown,
+    rateLimit: opts.rateLimit,
     docker: opts.docker,
   });
 
@@ -94,6 +95,7 @@ export interface ParsedArgs {
   auth: "none" | "bearer" | "api-key";
   health: boolean;
   shutdown: boolean;
+  rateLimit: boolean;
   docker: boolean;
   showHelp: boolean;
   showVersion: boolean;
@@ -108,6 +110,7 @@ export function parseInitArgs(argv: readonly string[]): ParsedArgs {
     auth: "none",
     health: true,
     shutdown: true,
+    rateLimit: true,
     docker: true,
     showHelp: false,
     showVersion: false,
@@ -144,6 +147,10 @@ export function parseInitArgs(argv: readonly string[]): ParsedArgs {
     }
     if (arg === "--no-shutdown") {
       args.shutdown = false;
+      continue;
+    }
+    if (arg === "--no-rate-limit") {
+      args.rateLimit = false;
       continue;
     }
     if (arg === "--target-dir") {

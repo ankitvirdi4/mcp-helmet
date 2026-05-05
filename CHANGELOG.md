@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0-alpha.4
+
+### Minor Changes
+
+- Adds `rateLimiter()` middleware and wires it into the CLI scaffolder.
+
+  ### Added
+
+  - **`rateLimiter({ max, windowMs, keyFn?, headers?, message? })` middleware.** Sliding window rate limiter, in-memory by default, keyed by remote IP (with `x-forwarded-for` fallback for reverse-proxied setups). Custom `keyFn` supports keying by API key, authenticated user, or anything else from the request. Allowed requests get `x-ratelimit-limit` / `x-ratelimit-remaining` / `x-ratelimit-reset` headers; rejected requests get `429` plus `retry-after` and a JSON body. Setup hook returns a cleanup that clears the interval and the in-memory store. 12 unit tests.
+  - **CLI `--no-rate-limit` flag.** `mcp-helmet init` now installs `rateLimiter()` by default. Pass `--no-rate-limit` to opt out. Generated `src/index.ts` includes a sane default (100 requests / minute / IP). For stdio transport the middleware is a no-op since there is no HTTP request lifecycle, so leaving it on is harmless.
+  - **README section in scaffolded projects.** When rate limiting is on and the transport includes HTTP, the generated README explains how to tune `max` / `windowMs` and how to swap the default IP-based key for an API-key or user-based key.
+
+  ### Notes
+
+  - 133 tests, all green (+12 from `rateLimiter`, +1 covering the CLI toggle).
+  - Persistent / Redis-backed store and per-tool buckets stay out of scope for v0.1; planned for v0.2 alongside the session externalisation stopgap.
+
 ## 0.1.0-alpha.3
 
 ### Minor Changes
