@@ -1,11 +1,12 @@
 // createServer() — the toolkit entry point.
 //
 // Wraps @modelcontextprotocol/sdk's McpServer with auto content wrapping,
-// auto transport detection, and a thinner tool-registration API. Delegates
-// all protocol logic to the underlying McpServer.
+// auto transport detection, a thinner tool-registration API, and a
+// composable middleware system. Delegates protocol logic to the SDK.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { wrapToolReturn } from "./content.js";
+import type { Middleware, SetupCleanup } from "./middleware.js";
 import { resolveTransport } from "./transport.js";
 import type {
   ContentItem,
@@ -14,10 +15,6 @@ import type {
   ToolReturn,
 } from "./types.js";
 
-export interface ToolHandlerArgs<TInput> {
-  args: TInput;
-}
-
 export type ToolHandler<TInput = unknown> = (
   args: TInput,
 ) => Promise<ToolReturn> | ToolReturn;
@@ -25,10 +22,14 @@ export type ToolHandler<TInput = unknown> = (
 export interface ToolkitServer {
   // The underlying SDK server. Escape hatch for advanced use.
   readonly raw: McpServer;
+  // Registered tool names. Useful for health checks, debugging.
+  readonly toolNames: readonly string[];
+  // Wall clock millisecond timestamp from start() onward, otherwise null.
+  readonly startedAt: number | null;
+  // Server name + version forwarded from createServer opts.
+  readonly info: { name: string; version: string };
 
   // Register a tool with auto content wrapping and Zod-or-shape input.
-  // Input can be a Zod object schema, a raw shape record like { x: z.string() },
-  // or undefined for tools that take no input.
   tool(
     name: string,
     inputShape: Record<string, unknown> | unknown | undefined,
@@ -36,9 +37,13 @@ export interface ToolkitServer {
     description?: string,
   ): void;
 
-  // Connect the underlying McpServer to the resolved transport and start
-  // listening. For stdio, returns once connected. For http, starts an
-  // http.Server and returns a stop() handle.
+  // Append a middleware to the chain. Order matters: middleware appended
+  // earlier sees requests first.
+  use(middleware: Middleware): void;
+
+  // Connect to the resolved transport and start listening. Returns a stop()
+  // handle that cleans up middleware, drains in-flight requests, and closes
+  // the transport.
   start(opts?: StartOptions): Promise<{ stop: () => Promise<void> }>;
 }
 
@@ -49,105 +54,146 @@ export function createServer(opts: CreateServerOptions): ToolkitServer {
     ...(opts.title !== undefined ? { title: opts.title } : {}),
   });
 
-  const tool: ToolkitServer["tool"] = (
-    name,
-    inputShape,
-    handler,
-    description,
-  ) => {
-    const wrappedHandler = async (
-      input: unknown,
-    ): Promise<{ content: ContentItem[]; isError?: boolean }> => {
-      try {
-        const result = await handler(input);
-        return { content: wrapToolReturn(result as ToolReturn) };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: "text", text: message }],
-          isError: true,
-        };
-      }
-    };
+  const middlewares: Middleware[] = [];
+  const toolNames: string[] = [];
+  let startedAt: number | null = null;
 
-    if (inputShape === undefined || inputShape === null) {
-      // No-input tool: register without an input schema.
-      const opts = description ? { description } : undefined;
-      // McpServer.registerTool accepts optional config + handler.
-      registerToolCompat(raw, name, opts, wrappedHandler);
-      return;
-    }
-
-    // Pass the input shape as-is. The SDK >=1.26 supports raw Zod shapes
-    // (ZodRawShape) and wraps them with z.object() internally, and also
-    // accepts JSON Schema directly via the inputSchema field.
-    const config: Record<string, unknown> = { inputSchema: inputShape };
-    if (description) config.description = description;
-    registerToolCompat(raw, name, config, wrappedHandler);
-  };
-
-  const start: ToolkitServer["start"] = async (startOpts) => {
-    const resolved = resolveTransport(startOpts);
-
-    if (resolved.transport === "stdio") {
-      const { StdioServerTransport } = await import(
-        "@modelcontextprotocol/sdk/server/stdio.js"
-      );
-      // In stdio mode stdout is the protocol channel; redirect noisy logging
-      // to stderr to avoid corrupting the JSON-RPC stream.
-      redirectConsoleToStderr();
-      const transport = new StdioServerTransport();
-      await raw.connect(transport);
-      return {
-        stop: async () => {
-          await transport.close();
-        },
+  const server: ToolkitServer = {
+    raw,
+    get toolNames() {
+      return toolNames as readonly string[];
+    },
+    get startedAt() {
+      return startedAt;
+    },
+    info: { name: opts.name, version: opts.version },
+    tool(name, inputShape, handler, description) {
+      const wrappedHandler = async (
+        input: unknown,
+      ): Promise<{ content: ContentItem[]; isError?: boolean }> => {
+        try {
+          const result = await handler(input);
+          return { content: wrapToolReturn(result as ToolReturn) };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [{ type: "text", text: message }],
+            isError: true,
+          };
+        }
       };
-    }
 
-    // HTTP transport.
-    const { StreamableHTTPServerTransport } = await import(
-      "@modelcontextprotocol/sdk/server/streamableHttp.js"
-    );
-    const http = await import("node:http");
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-    });
-    await raw.connect(transport);
+      if (inputShape === undefined || inputShape === null) {
+        const config = description ? { description } : undefined;
+        registerToolCompat(raw, name, config, wrappedHandler);
+      } else {
+        const config: Record<string, unknown> = { inputSchema: inputShape };
+        if (description) config.description = description;
+        registerToolCompat(raw, name, config, wrappedHandler);
+      }
+      toolNames.push(name);
+    },
+    use(mw) {
+      middlewares.push(mw);
+    },
+    async start(startOpts) {
+      const resolved = resolveTransport(startOpts);
+      const cleanups: SetupCleanup[] = [];
 
-    const httpServer = http.createServer(async (req, res) => {
-      try {
-        await transport.handleRequest(req, res);
-      } catch (err) {
-        if (!res.headersSent) {
-          res.statusCode = 500;
-          res.setHeader("content-type", "application/json");
-          res.end(
-            JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-          );
+      // Run setup hooks before connecting the transport so middleware can
+      // register signal handlers, log transports, etc.
+      for (const mw of middlewares) {
+        if (mw.setup) {
+          const cleanup = await mw.setup(server);
+          if (typeof cleanup === "function") cleanups.push(cleanup);
         }
       }
-    });
 
-    await new Promise<void>((resolve) =>
-      httpServer.listen(resolved.port, resolved.host, () => resolve()),
-    );
+      let stopTransport: () => Promise<void>;
 
-    return {
-      stop: async () => {
-        await new Promise<void>((resolve, reject) =>
-          httpServer.close((err) => (err ? reject(err) : resolve())),
+      if (resolved.transport === "stdio") {
+        // stdio mode: middleware `before` hooks do not run because there is
+        // no HTTP request lifecycle.
+        const { StdioServerTransport } = await import(
+          "@modelcontextprotocol/sdk/server/stdio.js"
         );
-        await transport.close();
-      },
-    };
+        redirectConsoleToStderr();
+        const transport = new StdioServerTransport();
+        await raw.connect(transport);
+        stopTransport = async () => {
+          await transport.close();
+        };
+      } else {
+        // HTTP transport with middleware chain.
+        const { StreamableHTTPServerTransport } = await import(
+          "@modelcontextprotocol/sdk/server/streamableHttp.js"
+        );
+        const http = await import("node:http");
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => crypto.randomUUID(),
+        });
+        await raw.connect(transport);
+
+        const httpServer = http.createServer(async (req, res) => {
+          try {
+            for (const mw of middlewares) {
+              if (mw.before) {
+                const result = await mw.before({ req, res });
+                if (result && result.handled) return;
+              }
+            }
+            await transport.handleRequest(req, res);
+          } catch (err) {
+            if (!res.headersSent) {
+              res.statusCode = 500;
+              res.setHeader("content-type", "application/json");
+              res.end(
+                JSON.stringify({
+                  error: err instanceof Error ? err.message : String(err),
+                }),
+              );
+            }
+          }
+        });
+
+        await new Promise<void>((resolve) =>
+          httpServer.listen(resolved.port, resolved.host, () => resolve()),
+        );
+
+        stopTransport = async () => {
+          await new Promise<void>((resolve, reject) =>
+            httpServer.close((err) => (err ? reject(err) : resolve())),
+          );
+          await transport.close();
+        };
+      }
+
+      startedAt = Date.now();
+
+      const stop = async (): Promise<void> => {
+        // Cleanup middleware in reverse order of setup. Last installed
+        // teardown runs first. Each cleanup is best effort: errors logged
+        // to stderr but do not prevent later cleanups from running.
+        for (const cleanup of cleanups.slice().reverse()) {
+          try {
+            await cleanup();
+          } catch (err) {
+            console.error("mcp-helmet: middleware cleanup error:", err);
+          }
+        }
+        await stopTransport();
+        startedAt = null;
+      };
+
+      return { stop };
+    },
   };
 
-  return { raw, tool, start };
+  return server;
 }
 
 // Compatibility helper. SDK's McpServer changed registration shape between
-// versions. This calls the closest available registerTool/tool method without
+// versions. Calls the closest available registerTool/tool method without
 // committing to one signature.
 function registerToolCompat(
   raw: McpServer,
@@ -170,8 +216,6 @@ function registerToolCompat(
 
 function redirectConsoleToStderr(): void {
   if (typeof process === "undefined" || !process.stderr) return;
-  // Replace console methods that default to stdout. console.error and
-  // console.warn already go to stderr, so leave them.
   console.log = (...args: unknown[]) => {
     process.stderr.write(args.map(stringify).join(" ") + "\n");
   };
