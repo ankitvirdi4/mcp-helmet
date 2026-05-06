@@ -16,6 +16,8 @@ export interface TemplateOptions {
   shutdown: boolean;
   rateLimit: boolean;
   docker: boolean;
+  tests: boolean;
+  ci: boolean;
 }
 
 export interface RenderedFile {
@@ -29,9 +31,19 @@ export function renderScaffold(opts: TemplateOptions): RenderedFile[] {
     { path: "package.json", contents: renderPackageJson(opts) },
     { path: "tsconfig.json", contents: renderTsconfig() },
     { path: ".gitignore", contents: renderGitignore() },
+    { path: "src/server.ts", contents: renderServerTs(opts) },
     { path: "src/index.ts", contents: renderIndexTs(opts) },
     { path: "README.md", contents: renderReadme(opts) },
   ];
+
+  if (opts.tests) {
+    files.push({ path: "src/server.test.ts", contents: renderServerTestTs(opts) });
+    files.push({ path: "vitest.config.ts", contents: renderVitestConfig() });
+  }
+
+  if (opts.ci) {
+    files.push({ path: ".github/workflows/ci.yml", contents: renderCiYml(opts) });
+  }
 
   if (opts.docker) {
     files.push({ path: "Dockerfile", contents: renderDockerfile(opts) });
@@ -42,28 +54,39 @@ export function renderScaffold(opts: TemplateOptions): RenderedFile[] {
 }
 
 function renderPackageJson(opts: TemplateOptions): string {
+  const scripts: Record<string, string> = {
+    build: "tsc -p tsconfig.json",
+    start: "node dist/index.js",
+    dev: "tsx src/index.ts",
+    typecheck: "tsc --noEmit",
+  };
+  if (opts.tests) {
+    scripts.test = "vitest";
+    scripts["test:run"] = "vitest run";
+  }
+
+  const devDependencies: Record<string, string> = {
+    "@types/node": "^22.0.0",
+    tsx: "^4.19.0",
+    typescript: "^5.6.0",
+  };
+  if (opts.tests) {
+    devDependencies.vitest = "^2.1.0";
+  }
+
   const pkg = {
     name: opts.name,
     version: "0.0.1",
     private: true,
     type: "module",
     main: "dist/index.js",
-    scripts: {
-      build: "tsc -p tsconfig.json",
-      start: "node dist/index.js",
-      dev: "tsx src/index.ts",
-      typecheck: "tsc --noEmit",
-    },
+    scripts,
     dependencies: {
       "@modelcontextprotocol/sdk": "^1.29.0",
       "mcp-helmet": `^${VERSION}`,
       zod: "^3.24.0",
     },
-    devDependencies: {
-      "@types/node": "^22.0.0",
-      tsx: "^4.19.0",
-      typescript: "^5.6.0",
-    },
+    devDependencies,
     engines: {
       node: ">=20",
     },
@@ -109,7 +132,11 @@ function renderDockerignore(): string {
   ].join("\n");
 }
 
-function renderIndexTs(opts: TemplateOptions): string {
+// server.ts holds the server factory + middleware + tool registration.
+// index.ts only calls start(). Splitting the two files makes the server
+// testable: tests import `server` from server.ts and connect via
+// InMemoryTransport without ever calling start().
+function renderServerTs(opts: TemplateOptions): string {
   const imports = ["createServer"];
   if (opts.health) imports.push("healthCheck");
   if (opts.rateLimit) imports.push("rateLimiter");
@@ -122,7 +149,7 @@ function renderIndexTs(opts: TemplateOptions): string {
   lines.push(`import { z } from "zod";`);
   lines.push("");
   lines.push(
-    `const server = createServer({ name: "${opts.name}", version: "0.0.1" });`,
+    `export const server = createServer({ name: "${opts.name}", version: "0.0.1" });`,
   );
   lines.push("");
 
@@ -198,11 +225,19 @@ function renderIndexTs(opts: TemplateOptions): string {
   lines.push(");");
   lines.push("");
 
+  return lines.join("\n");
+}
+
+function renderIndexTs(opts: TemplateOptions): string {
+  const lines: string[] = [];
+  lines.push(`import { server } from "./server.js";`);
+  lines.push("");
+
   if (opts.transport === "stdio") {
-    lines.push("// stdio transport — local development and Claude Desktop.");
+    lines.push("// stdio transport for local development and Claude Desktop.");
     lines.push('await server.start({ transport: "stdio" });');
   } else if (opts.transport === "http") {
-    lines.push("// HTTP transport — production.");
+    lines.push("// HTTP transport for production.");
     lines.push("const port = Number(process.env.PORT ?? 3000);");
     lines.push("const handle = await server.start({ transport: \"http\", port });");
     lines.push('console.error(`mcp server listening on http://${handle.host}:${handle.port}`);');
@@ -216,6 +251,91 @@ function renderIndexTs(opts: TemplateOptions): string {
 
   lines.push("");
   return lines.join("\n");
+}
+
+function renderServerTestTs(opts: TemplateOptions): string {
+  const lines: string[] = [];
+  lines.push(`import { Client } from "@modelcontextprotocol/sdk/client/index.js";`);
+  lines.push(`import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";`);
+  lines.push(`import { describe, expect, it } from "vitest";`);
+  lines.push(`import { server } from "./server.js";`);
+  lines.push("");
+  lines.push("// Connects the in-memory transport pair and returns a ready client.");
+  lines.push("// No HTTP, no subprocess; the SDK wires both ends in-process.");
+  lines.push("async function connect(): Promise<{ client: Client; close: () => Promise<void> }> {");
+  lines.push("  const [a, b] = InMemoryTransport.createLinkedPair();");
+  lines.push("  await server.raw.connect(a);");
+  lines.push('  const client = new Client({ name: "test", version: "1.0.0" }, { capabilities: {} });');
+  lines.push("  await client.connect(b);");
+  lines.push("  return {");
+  lines.push("    client,");
+  lines.push("    close: async () => { await client.close(); },");
+  lines.push("  };");
+  lines.push("}");
+  lines.push("");
+  lines.push(`describe("${opts.name}", () => {`);
+  lines.push("  it(\"lists registered tools\", async () => {");
+  lines.push("    const { client, close } = await connect();");
+  lines.push("    const list = await client.listTools();");
+  lines.push("    expect(list.tools.map((t) => t.name)).toContain(\"greet\");");
+  lines.push("    await close();");
+  lines.push("  });");
+  lines.push("");
+  lines.push("  it(\"greet returns the formatted greeting\", async () => {");
+  lines.push("    const { client, close } = await connect();");
+  lines.push('    const result = await client.callTool({ name: "greet", arguments: { name: "World" } });');
+  lines.push("    const text = (result.content as Array<{ text: string }>)[0].text;");
+  lines.push('    expect(text).toBe("Hello, World!");');
+  lines.push("    await close();");
+  lines.push("  });");
+  lines.push("});");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function renderVitestConfig(): string {
+  return [
+    `import { defineConfig } from "vitest/config";`,
+    "",
+    "export default defineConfig({",
+    "  test: {",
+    "    include: [\"src/**/*.test.ts\"],",
+    "  },",
+    "});",
+    "",
+  ].join("\n");
+}
+
+function renderCiYml(opts: TemplateOptions): string {
+  const steps: string[] = [
+    "      - uses: actions/checkout@v4",
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: 20",
+    "          cache: npm",
+    "      - run: npm ci",
+    "      - run: npm run typecheck",
+  ];
+  if (opts.tests) {
+    steps.push("      - run: npm run test:run");
+  }
+  steps.push("      - run: npm run build");
+
+  return [
+    `name: CI`,
+    "",
+    "on:",
+    "  push:",
+    "    branches: [main]",
+    "  pull_request:",
+    "",
+    "jobs:",
+    "  build:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    ...steps,
+    "",
+  ].join("\n");
 }
 
 function renderReadme(opts: TemplateOptions): string {

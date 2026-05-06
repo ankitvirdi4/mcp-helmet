@@ -6,6 +6,7 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: [
         "src/**/*.test.ts",
+        "src/__fixtures__/**",
         "src/types.ts",
         "src/middleware.ts",
         "src/index.ts",

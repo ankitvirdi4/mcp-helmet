@@ -50,6 +50,8 @@ export async function runInit(
     shutdown: opts.shutdown,
     rateLimit: opts.rateLimit,
     docker: opts.docker,
+    tests: opts.tests,
+    ci: opts.ci,
   });
 
   const written: string[] = [];
@@ -97,6 +99,8 @@ export interface ParsedArgs {
   shutdown: boolean;
   rateLimit: boolean;
   docker: boolean;
+  tests: boolean;
+  ci: boolean;
   showHelp: boolean;
   showVersion: boolean;
 }
@@ -112,6 +116,8 @@ export function parseInitArgs(argv: readonly string[]): ParsedArgs {
     shutdown: true,
     rateLimit: true,
     docker: true,
+    tests: true,
+    ci: true,
     showHelp: false,
     showVersion: false,
   };
@@ -151,6 +157,14 @@ export function parseInitArgs(argv: readonly string[]): ParsedArgs {
     }
     if (arg === "--no-rate-limit") {
       args.rateLimit = false;
+      continue;
+    }
+    if (arg === "--no-tests") {
+      args.tests = false;
+      continue;
+    }
+    if (arg === "--no-ci") {
+      args.ci = false;
       continue;
     }
     if (arg === "--target-dir") {

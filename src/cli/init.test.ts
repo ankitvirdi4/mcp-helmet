@@ -68,6 +68,14 @@ describe("parseInitArgs", () => {
     expect(a.shutdown).toBe(true);
     expect(a.rateLimit).toBe(true);
     expect(a.docker).toBe(true);
+    expect(a.tests).toBe(true);
+    expect(a.ci).toBe(true);
+  });
+
+  it("parses --no-tests and --no-ci", () => {
+    const a = parseInitArgs(["my-server", "--no-tests", "--no-ci"]);
+    expect(a.tests).toBe(false);
+    expect(a.ci).toBe(false);
   });
 
   it("parses --transport, --auth, and the --no-* flags", () => {
@@ -129,8 +137,9 @@ describe("runInit", () => {
         auth: "none",
         health: true,
         shutdown: true,
-       rateLimit: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
@@ -138,17 +147,145 @@ describe("runInit", () => {
 
     expect(result.filesWritten.sort()).toEqual([
       ".dockerignore",
+      ".github/workflows/ci.yml",
       ".gitignore",
       "Dockerfile",
       "README.md",
       "package.json",
       "src/index.ts",
+      "src/server.test.ts",
+      "src/server.ts",
       "tsconfig.json",
+      "vitest.config.ts",
     ]);
     expect(writer.files.has("/tmp/demo/package.json")).toBe(true);
+    expect(writer.files.has("/tmp/demo/src/server.ts")).toBe(true);
     expect(writer.files.has("/tmp/demo/src/index.ts")).toBe(true);
+    expect(writer.files.has("/tmp/demo/src/server.test.ts")).toBe(true);
+    expect(writer.files.has("/tmp/demo/vitest.config.ts")).toBe(true);
+    expect(writer.files.has("/tmp/demo/.github/workflows/ci.yml")).toBe(true);
     expect(writer.dirs.has("/tmp/demo")).toBe(true);
     expect(writer.dirs.has("/tmp/demo/src")).toBe(true);
+  });
+
+  it("omits test files when --no-tests and CI when --no-ci", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "stdio",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: false,
+        ci: false,
+        docker: false,
+      },
+      writer,
+    );
+    expect(writer.files.has("/tmp/demo/src/server.test.ts")).toBe(false);
+    expect(writer.files.has("/tmp/demo/vitest.config.ts")).toBe(false);
+    expect(writer.files.has("/tmp/demo/.github/workflows/ci.yml")).toBe(false);
+
+    const pkg = JSON.parse(writer.files.get("/tmp/demo/package.json")!);
+    expect(pkg.devDependencies.vitest).toBeUndefined();
+    expect(pkg.scripts.test).toBeUndefined();
+  });
+
+  it("generated server.ts is importable; index.ts only calls start", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "dual",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: true,
+        ci: true,
+        docker: false,
+      },
+      writer,
+    );
+    const serverTs = writer.files.get("/tmp/demo/src/server.ts")!;
+    const indexTs = writer.files.get("/tmp/demo/src/index.ts")!;
+    expect(serverTs).toContain("export const server = createServer");
+    expect(indexTs).toContain('import { server } from "./server.js"');
+    expect(indexTs).toContain("server.start");
+    expect(indexTs).not.toContain("createServer(");
+  });
+
+  it("generated test file imports from ./server.js and exercises greet", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "stdio",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: true,
+        ci: false,
+        docker: false,
+      },
+      writer,
+    );
+    const test = writer.files.get("/tmp/demo/src/server.test.ts")!;
+    expect(test).toContain('from "./server.js"');
+    expect(test).toContain("InMemoryTransport");
+    expect(test).toContain('"greet"');
+  });
+
+  it("generated CI workflow runs typecheck, test, and build", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "dual",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: true,
+        ci: true,
+        docker: false,
+      },
+      writer,
+    );
+    const ci = writer.files.get("/tmp/demo/.github/workflows/ci.yml")!;
+    expect(ci).toContain("npm run typecheck");
+    expect(ci).toContain("npm run test:run");
+    expect(ci).toContain("npm run build");
+    expect(ci).toContain("node-version: 20");
+  });
+
+  it("omits the test step from CI when tests are disabled", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "dual",
+        auth: "none",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: false,
+        ci: true,
+        docker: false,
+      },
+      writer,
+    );
+    const ci = writer.files.get("/tmp/demo/.github/workflows/ci.yml")!;
+    expect(ci).not.toContain("test:run");
+    expect(ci).toContain("typecheck");
   });
 
   it("omits Docker files when --no-docker", async () => {
@@ -162,6 +299,8 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: false,
       },
       writer,
@@ -181,11 +320,13 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
     );
-    const index = writer.files.get("/tmp/demo/src/index.ts")!;
+    const index = writer.files.get("/tmp/demo/src/server.ts")!;
     expect(index).toContain("bearerAuth");
     expect(index).toContain("getAuthContext");
     expect(index).toContain('verify: async (token)');
@@ -203,11 +344,13 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
     );
-    const index = writer.files.get("/tmp/demo/src/index.ts")!;
+    const index = writer.files.get("/tmp/demo/src/server.ts")!;
     expect(index).toContain("apiKeyAuth");
     expect(index).toContain("validate: async (key)");
     expect(index).not.toContain("bearerAuth");
@@ -224,11 +367,13 @@ describe("runInit", () => {
         health: false,
         shutdown: false,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: false,
       },
       writer,
     );
-    const index = writer.files.get("/tmp/demo/src/index.ts")!;
+    const index = writer.files.get("/tmp/demo/src/server.ts")!;
     expect(index).not.toContain("healthCheck");
     expect(index).not.toContain("gracefulShutdown");
   });
@@ -244,11 +389,13 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: false,
       },
       writer,
     );
-    const onIndex = writer.files.get("/tmp/demo/src/index.ts")!;
+    const onIndex = writer.files.get("/tmp/demo/src/server.ts")!;
     expect(onIndex).toContain("rateLimiter");
     expect(onIndex).toContain("server.use(rateLimiter(");
 
@@ -262,11 +409,13 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: false,
+        tests: true,
+        ci: true,
         docker: false,
       },
       writer2,
     );
-    const offIndex = writer2.files.get("/tmp/other/src/index.ts")!;
+    const offIndex = writer2.files.get("/tmp/other/src/server.ts")!;
     expect(offIndex).not.toContain("rateLimiter");
   });
 
@@ -281,6 +430,8 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
@@ -302,6 +453,8 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
@@ -324,6 +477,8 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: true,
       },
       writer,
@@ -343,6 +498,8 @@ describe("runInit", () => {
           health: true,
           shutdown: true,
           rateLimit: true,
+          tests: true,
+          ci: true,
           docker: true,
         },
         writer,
@@ -362,6 +519,8 @@ describe("runInit", () => {
           health: true,
           shutdown: true,
           rateLimit: true,
+          tests: true,
+          ci: true,
           docker: true,
         },
         writer,
@@ -381,6 +540,8 @@ describe("runInit", () => {
         health: true,
         shutdown: true,
         rateLimit: true,
+        tests: true,
+        ci: true,
         docker: false,
       },
       writer,

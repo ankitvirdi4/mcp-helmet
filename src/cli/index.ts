@@ -20,6 +20,8 @@ Flags:
   --no-shutdown                   Skip gracefulShutdown() middleware
   --no-rate-limit                 Skip rateLimiter() middleware
   --no-docker                     Skip Dockerfile + .dockerignore
+  --no-tests                      Skip vitest config + sample test
+  --no-ci                         Skip GitHub Actions CI workflow
   --target-dir <path>             Where to create the project. Default: ./<name>
 
   -h, --help                      Show this help
@@ -82,6 +84,8 @@ export async function main(argv: readonly string[]): Promise<number> {
         shutdown: parsed.shutdown,
         rateLimit: parsed.rateLimit,
         docker: parsed.docker,
+        tests: parsed.tests,
+        ci: parsed.ci,
       },
       fsWriter,
     );
