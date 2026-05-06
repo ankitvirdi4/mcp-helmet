@@ -136,7 +136,24 @@ const fsWriter: InitWriter = {
 };
 
 // Run when invoked directly (not when imported by tests).
-const isDirect = import.meta.url === `file://${process.argv[1]}`;
+//
+// The naive `import.meta.url === file://${process.argv[1]}` check fails
+// when the package is installed: npm symlinks `node_modules/.bin/mcp-helmet`
+// to `node_modules/mcp-helmet/dist/cli.js`, so `argv[1]` is the symlink
+// path while `import.meta.url` points at the realpath. Resolve both to
+// realpaths and compare as file:// URLs.
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const isDirect = (() => {
+  try {
+    if (!process.argv[1]) return false;
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+})();
+
 if (isDirect) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),

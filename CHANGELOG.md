@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- **Fix `npx mcp-helmet init` silently exiting when invoked via the installed bin.** When the package is installed as a dependency, npm symlinks `node_modules/.bin/mcp-helmet` to `node_modules/mcp-helmet/dist/cli.js`. The CLI's "is this the entry point?" check compared `import.meta.url` against `file://${process.argv[1]}`, but `argv[1]` was the symlink path while `import.meta.url` was the realpath. The check evaluated false, `main()` never ran, the process exited cleanly with no output. End-to-end installs were broken from alpha.3 onward but the in-repo smoke (which invoked `node dist/cli.js` directly) never tripped over it. The check now resolves both sides via `realpathSync` + `pathToFileURL` before comparison.
+
+Surfaced when scaffolding the `mcp-helmet-fs-example` validation project from the published alpha.6 tarball. Anyone who tried `npx mcp-helmet init` from any prior published alpha hit a no-op.
+
 ## 0.1.0-alpha.6
 
 ### Patch Changes
