@@ -124,7 +124,7 @@ v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage.
 | Session externalization | No | Stopgap until upstream SEP |
 | Docker/deployment templates | No | Yes, planned |
 
-The SDK is a peer dependency. You bring your own version. If the SDK adds features that overlap, the toolkit middleware becomes a thin pass-through.
+The SDK is a peer dependency. You bring your own version. If the SDK adds features that overlap, mcp-helmet middleware becomes a thin pass-through.
 
 ## Requirements
 
