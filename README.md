@@ -105,7 +105,9 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 - ✅ `gracefulShutdown()` middleware
 - ✅ `bearerAuth()` and `apiKeyAuth()` middleware with AsyncLocalStorage-based `getAuthContext()`
 - ✅ `rateLimiter()` middleware (sliding window, IP- or key-based, standard 429 headers)
+- ✅ `requestLog()` middleware (one JSON line per request, captures auth principal automatically)
 - ✅ `npx mcp-helmet init` CLI scaffolder + Docker template
+- ✅ `examples/` directory with three runnable scenarios
 
 v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage. v0.2 is on the [ROADMAP](./CHANGELOG.md): Redis-backed session store, structured logging middleware, Python port via FastMCP plugin.
 

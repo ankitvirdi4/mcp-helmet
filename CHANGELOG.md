@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-alpha.5
+
+### Minor Changes
+
+- Adds structured `requestLog()` middleware and an `examples/` directory with three runnable scenarios.
+
+  ### Added
+
+  - **`requestLog({ logger?, skip?, extra? })` middleware.** One JSON line per HTTP request emitted at response time. Each entry has `ts`, `method`, `url`, `status`, `duration_ms`, plus `user` / `scopes` populated automatically from `getAuthContext()` whenever an auth middleware ran first. Pluggable `logger` (default writes to stderr so dual-mode stdio servers stay safe), pluggable `skip` (default skips `GET /healthz`), and an `extra(req)` hook for injecting request id / tenant id / anything else. Wraps `res.end` and listens for `close` so connections that hang up before completion still emit. 12 unit tests.
+  - **`examples/` directory.** Three single-file, copy-pasteable scenarios that run against the local source via `npx tsx`:
+    - `01-stdio-greet.ts`: minimal stdio server with one tool.
+    - `02-http-bearer-rate-limit.ts`: HTTP transport with `healthCheck`, `rateLimiter`, `bearerAuth`, `gracefulShutdown`, and a `whoami` tool that reads `getAuthContext()`.
+    - `03-audit-logging.ts`: same chain plus `requestLog` with a `request_id` extractor, demonstrating the `requestLog → bearerAuth → getAuthContext` flow.
+    - `examples/README.md` indexes them with run instructions.
+
+  ### Notes
+
+  - 146 tests, all green (+12 from `requestLog`).
+  - End-to-end smoke verified: `examples/03-audit-logging.ts` emits a JSON line with `user: "dev"`, `scopes: ["audit"]`, `status: 200` for an authenticated MCP `initialize`, and a `status: 401` line with no user for an unauthenticated request.
+
 ## 0.1.0-alpha.4
 
 ### Minor Changes

@@ -34,6 +34,8 @@ export { apiKeyAuth } from "./middleware/api-key-auth.js";
 export type { ApiKeyAuthOptions } from "./middleware/api-key-auth.js";
 export { rateLimiter } from "./middleware/rate-limiter.js";
 export type { RateLimiterOptions } from "./middleware/rate-limiter.js";
+export { requestLog } from "./middleware/request-log.js";
+export type { RequestLogEntry, RequestLogOptions } from "./middleware/request-log.js";
 
 export { getAuthContext, runWithAuthContext } from "./auth-context.js";
 export type { AuthContext } from "./auth-context.js";
