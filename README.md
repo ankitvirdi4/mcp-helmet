@@ -26,7 +26,9 @@ npm install
 npm run dev
 ```
 
-You get a working MCP server with `healthCheck()`, `gracefulShutdown()`, optional auth, a multistage `Dockerfile`, and a typechecked `tsconfig`. Drop flags to skip pieces (`--no-docker`, `--no-health`, etc.) or customise after the fact.
+You get a working MCP server with `healthCheck()`, `gracefulShutdown()`, optional auth, a multistage `Dockerfile`, a typechecked `tsconfig`, a passing test, and a CI workflow. Drop flags to skip pieces (`--no-docker`, `--no-health`, `--no-rate-limit`, `--no-tests`, `--no-ci`) or customise after the fact.
+
+Want richer worked examples with auth, rate limiting, and audit logging? See [`examples/`](./examples).
 
 Or wire it manually:
 
@@ -131,6 +133,62 @@ the script exits non-zero if a future change pushes the ratio above 5x.
 
 See [`benchmarks/README.md`](./benchmarks/README.md) for tunables and
 methodology.
+
+## Migrate from the raw SDK
+
+If you already have an MCP server using `@modelcontextprotocol/sdk` directly, mcp-helmet drops in without rewriting your tools. Three concrete swaps:
+
+```typescript
+// Before
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new McpServer({ name: "x", version: "1.0.0" });
+server.tool("greet", { name: z.string() }, async ({ name }) => ({
+  content: [{ type: "text", text: `Hello, ${name}!` }],
+}));
+const transport = new StdioServerTransport();
+await server.connect(transport);
+
+// After
+import { createServer } from "mcp-helmet";
+
+const server = createServer({ name: "x", version: "1.0.0" });
+server.tool("greet", { name: z.string() }, async ({ name }) => `Hello, ${name}!`);
+await server.start();
+```
+
+The handler returns a string and gets auto wrapped into `TextContent`. The transport is selected from `MCP_TRANSPORT` (defaults to stdio). The underlying `McpServer` is still available as `server.raw` if you need it.
+
+Adding middleware afterwards is one line per concern:
+
+```typescript
+server.use(healthCheck());
+server.use(requestLog());
+server.use(rateLimiter({ max: 100, windowMs: 60_000 }));
+server.use(bearerAuth({ verify: myVerifier }));
+server.use(gracefulShutdown());
+```
+
+## Troubleshooting
+
+**`getAuthContext()` returns undefined inside my tool handler.**
+The auth middleware that populates the context (`bearerAuth` or `apiKeyAuth`) must be installed via `server.use(...)` before `server.start()`. The toolkit reads `getAuthContext()` from AsyncLocalStorage scoped to each HTTP request. If you call it from a stdio server (no HTTP request lifecycle), it always returns `undefined`.
+
+**Graceful shutdown does not fire.**
+`gracefulShutdown()` only listens for SIGTERM / SIGINT in the toolkit's HTTP path. In stdio mode the parent process owns the lifecycle (Claude Desktop, Inspector, your spawn parent), so the toolkit does not need to register signal handlers.
+
+**`tools/list` is empty.**
+Call `server.tool(...)` before `server.start()`. Tool registration is captured at start time; tools registered afterwards are not advertised.
+
+**The rate limiter never triggers.**
+`rateLimiter()` only runs in HTTP mode because stdio has no per-request HTTP lifecycle for the middleware to hook. Including it in a stdio server is a harmless no-op.
+
+**Zod v3 vs v4 imports look weird.**
+The toolkit detects which Zod major you have and adapts at runtime. If you are on Zod 3.22+ on the v3 line, just `import { z } from "zod"`. If you are on Zod 4 and want the new APIs, use `import * as z from "zod/v4"`. The toolkit accepts schemas from either.
+
+**`StreamableHTTPClientTransport` returns 401.**
+You have an auth middleware in the chain. Pass the right `Authorization` header in `requestInit.headers` when constructing the client transport. See [`examples/02-http-bearer-rate-limit.ts`](./examples/02-http-bearer-rate-limit.ts).
 
 ## How it relates to the official SDK
 
