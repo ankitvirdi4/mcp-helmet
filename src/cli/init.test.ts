@@ -333,6 +333,43 @@ describe("runInit", () => {
     expect(index).not.toContain("apiKeyAuth");
   });
 
+  it("includes JWT-verifying wiring when --auth bearer-jwt", async () => {
+    const writer = makeMemWriter();
+    await runInit(
+      {
+        name: "demo",
+        targetDir: "/tmp/demo",
+        transport: "http",
+        auth: "bearer-jwt",
+        health: true,
+        shutdown: true,
+        rateLimit: true,
+        tests: true,
+        ci: true,
+        docker: true,
+      },
+      writer,
+    );
+    const server = writer.files.get("/tmp/demo/src/server.ts")!;
+    expect(server).toContain("bearerAuth");
+    expect(server).toContain("getAuthContext");
+    expect(server).toContain("createRemoteJWKSet");
+    expect(server).toContain("jwtVerify");
+    expect(server).toContain("JWKS_URL");
+    expect(server).toContain("JWT_SECRET");
+    expect(server).toContain("JWT_ISSUER");
+    expect(server).toContain("JWT_AUDIENCE");
+    expect(server).not.toContain('"dev-token"');
+
+    const pkg = JSON.parse(writer.files.get("/tmp/demo/package.json")!);
+    expect(pkg.dependencies.jose).toMatch(/^\^/);
+
+    const readme = writer.files.get("/tmp/demo/README.md")!;
+    expect(readme).toContain("Auth (JWT)");
+    expect(readme).toContain("JWKS_URL");
+    expect(readme).toContain("JWT_SECRET");
+  });
+
   it("includes apiKeyAuth wiring when --auth api-key", async () => {
     const writer = makeMemWriter();
     await runInit(

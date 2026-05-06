@@ -11,7 +11,7 @@ import { VERSION } from "../version.js";
 export interface TemplateOptions {
   name: string;
   transport: "stdio" | "http" | "dual";
-  auth: "none" | "bearer" | "api-key";
+  auth: "none" | "bearer" | "bearer-jwt" | "api-key";
   health: boolean;
   shutdown: boolean;
   rateLimit: boolean;
@@ -74,6 +74,16 @@ function renderPackageJson(opts: TemplateOptions): string {
     devDependencies.vitest = "^2.1.0";
   }
 
+  const dependencies: Record<string, string> = {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "mcp-helmet": `^${VERSION}`,
+    zod: "^3.24.0",
+  };
+  if (opts.auth === "bearer-jwt") {
+    // jose is the modern, JWKS-aware verifier we use in the bearer-jwt preset.
+    dependencies.jose = "^5.9.0";
+  }
+
   const pkg = {
     name: opts.name,
     version: "0.0.1",
@@ -81,11 +91,7 @@ function renderPackageJson(opts: TemplateOptions): string {
     type: "module",
     main: "dist/index.js",
     scripts,
-    dependencies: {
-      "@modelcontextprotocol/sdk": "^1.29.0",
-      "mcp-helmet": `^${VERSION}`,
-      zod: "^3.24.0",
-    },
+    dependencies,
     devDependencies,
     engines: {
       node: ">=20",
@@ -141,11 +147,16 @@ function renderServerTs(opts: TemplateOptions): string {
   if (opts.health) imports.push("healthCheck");
   if (opts.rateLimit) imports.push("rateLimiter");
   if (opts.shutdown) imports.push("gracefulShutdown");
-  if (opts.auth === "bearer") imports.push("bearerAuth", "getAuthContext");
+  if (opts.auth === "bearer" || opts.auth === "bearer-jwt") {
+    imports.push("bearerAuth", "getAuthContext");
+  }
   if (opts.auth === "api-key") imports.push("apiKeyAuth", "getAuthContext");
 
   const lines: string[] = [];
   lines.push(`import { ${imports.join(", ")} } from "mcp-helmet";`);
+  if (opts.auth === "bearer-jwt") {
+    lines.push(`import { createRemoteJWKSet, jwtVerify } from "jose";`);
+  }
   lines.push(`import { z } from "zod";`);
   lines.push("");
   lines.push(
@@ -178,6 +189,42 @@ function renderServerTs(opts: TemplateOptions): string {
     lines.push('        return { user: "dev", scopes: ["read", "write"] };');
     lines.push("      }");
     lines.push("      return null;");
+    lines.push("    },");
+    lines.push("  }),");
+    lines.push(");");
+    lines.push("");
+  } else if (opts.auth === "bearer-jwt") {
+    lines.push("// Verify the bearer token as a JWT. Two ways to supply the key:");
+    lines.push("//   1) JWKS_URL: remote JWKS endpoint (Auth0, Cognito, Okta, etc.)");
+    lines.push("//   2) JWT_SECRET: shared HMAC secret (HS256). Useful for self-issued tokens.");
+    lines.push("// Optional: JWT_ISSUER and JWT_AUDIENCE for stricter validation.");
+    lines.push("// JWKS wins if both are set.");
+    lines.push("const JWKS = process.env.JWKS_URL");
+    lines.push("  ? createRemoteJWKSet(new URL(process.env.JWKS_URL))");
+    lines.push("  : null;");
+    lines.push("const SECRET = process.env.JWT_SECRET");
+    lines.push("  ? new TextEncoder().encode(process.env.JWT_SECRET)");
+    lines.push("  : null;");
+    lines.push("");
+    lines.push("server.use(");
+    lines.push("  bearerAuth({");
+    lines.push("    verify: async (token) => {");
+    lines.push("      try {");
+    lines.push("        const key = JWKS ?? SECRET;");
+    lines.push('        if (!key) throw new Error("Set JWKS_URL or JWT_SECRET");');
+    lines.push("        const { payload } = await jwtVerify(token, key as never, {");
+    lines.push("          issuer: process.env.JWT_ISSUER,");
+    lines.push("          audience: process.env.JWT_AUDIENCE,");
+    lines.push("        });");
+    lines.push("        return {");
+    lines.push("          user: payload.sub as string,");
+    lines.push('          scopes: typeof payload.scope === "string"');
+    lines.push('            ? payload.scope.split(" ")');
+    lines.push("            : [],");
+    lines.push("        };");
+    lines.push("      } catch {");
+    lines.push("        return null;");
+    lines.push("      }");
     lines.push("    },");
     lines.push("  }),");
     lines.push(");");
@@ -391,10 +438,39 @@ function renderReadme(opts: TemplateOptions): string {
   if (opts.auth === "bearer") {
     lines.push("## Auth");
     lines.push("");
-    lines.push("Stub bearer verification accepts the literal token `dev-token`. Replace `verify` in `src/index.ts` with your real check (JWT verification, token lookup, etc.).");
+    lines.push("Stub bearer verification accepts the literal token `dev-token`. Replace `verify` in `src/server.ts` with your real check (JWT verification, token lookup, etc.).");
     lines.push("");
     lines.push("```bash");
     lines.push('curl -H "Authorization: Bearer dev-token" http://localhost:3000/');
+    lines.push("```");
+    lines.push("");
+  } else if (opts.auth === "bearer-jwt") {
+    lines.push("## Auth (JWT)");
+    lines.push("");
+    lines.push("This server verifies bearer tokens as JWTs using [`jose`](https://github.com/panva/jose). Configure one of:");
+    lines.push("");
+    lines.push("- `JWKS_URL` — remote JWKS endpoint (Auth0, Cognito, Okta, your own JWKS).");
+    lines.push("- `JWT_SECRET` — shared HMAC secret for self-issued HS256 tokens.");
+    lines.push("");
+    lines.push("Optional:");
+    lines.push("");
+    lines.push("- `JWT_ISSUER` — required `iss` claim.");
+    lines.push("- `JWT_AUDIENCE` — required `aud` claim.");
+    lines.push("");
+    lines.push("Example with a shared secret:");
+    lines.push("");
+    lines.push("```bash");
+    lines.push('export JWT_SECRET="dev-secret"');
+    lines.push("npm run dev");
+    lines.push("```");
+    lines.push("");
+    lines.push("Then sign a token with the same secret and call the server:");
+    lines.push("");
+    lines.push("```bash");
+    lines.push("# Generate a token (once you have a signing helper of your own):");
+    lines.push("# TOKEN=$(node -e 'console.log(require(\"jsonwebtoken\").sign({ sub: \"alice\", scope: \"read write\" }, \"dev-secret\"))')");
+    lines.push("");
+    lines.push('curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/');
     lines.push("```");
     lines.push("");
   } else if (opts.auth === "api-key") {

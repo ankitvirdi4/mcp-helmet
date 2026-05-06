@@ -111,6 +111,27 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 
 v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage and a small set of confirmed users. The full plan, including v0.2 scope, gates, forcing events, and a kill switch, lives in [ROADMAP.md](./ROADMAP.md).
 
+## Performance
+
+Per-request overhead is below the measurement noise floor. Numbers from
+a single Node 20 run on Apple M1; expect 5-15% variance across runs.
+
+| Scenario | p50 (ms) | p95 (ms) | p99 (ms) | mean (ms) | req/s |
+|---|---|---|---|---|---|
+| bare | 0.16 | 0.21 | 0.41 | 0.18 | 5663 |
+| +requestLog | 0.15 | 0.18 | 0.28 | 0.16 | 6113 |
+| +bearerAuth | 0.16 | 0.20 | 0.31 | 0.17 | 5776 |
+| +rateLimiter | 0.16 | 0.21 | 0.36 | 0.18 | 5468 |
+| full stack | 0.16 | 0.21 | 0.33 | 0.17 | 5805 |
+
+`full stack / bare = 0.98x mean latency`, ie middleware cost is below
+what this benchmark can measure at the per-request scale. p99 stays
+sub-millisecond. Run `npm run bench` to reproduce on your hardware;
+the script exits non-zero if a future change pushes the ratio above 5x.
+
+See [`benchmarks/README.md`](./benchmarks/README.md) for tunables and
+methodology.
+
 ## How it relates to the official SDK
 
 `mcp-helmet` is **not** a fork, an alternative, or a replacement. It's a convenience layer.

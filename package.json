@@ -55,6 +55,7 @@
     "test": "vitest",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
+    "bench": "npx tsx benchmarks/bench.ts",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {

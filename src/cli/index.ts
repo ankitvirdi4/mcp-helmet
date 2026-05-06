@@ -15,7 +15,11 @@ Usage:
 
 Flags:
   --transport <stdio|http|dual>   Default: dual (auto via MCP_TRANSPORT)
-  --auth <none|bearer|api-key>    Default: none
+  --auth <none|bearer|bearer-jwt|api-key>
+                                  Default: none. bearer-jwt emits a real
+                                  jose-based JWT verify skeleton (JWKS_URL
+                                  or JWT_SECRET, optional JWT_ISSUER /
+                                  JWT_AUDIENCE).
   --no-health                     Skip healthCheck() middleware
   --no-shutdown                   Skip gracefulShutdown() middleware
   --no-rate-limit                 Skip rateLimiter() middleware
@@ -29,7 +33,7 @@ Flags:
 
 Examples:
   mcp-helmet init my-server
-  mcp-helmet init billing --transport http --auth bearer
+  mcp-helmet init billing --transport http --auth bearer-jwt
   mcp-helmet init local-only --transport stdio --no-docker
 `;
 

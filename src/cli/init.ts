@@ -94,7 +94,7 @@ export interface ParsedArgs {
   name: string;
   targetDir?: string;
   transport: "stdio" | "http" | "dual";
-  auth: "none" | "bearer" | "api-key";
+  auth: "none" | "bearer" | "bearer-jwt" | "api-key";
   health: boolean;
   shutdown: boolean;
   rateLimit: boolean;
@@ -140,7 +140,11 @@ export function parseInitArgs(argv: readonly string[]): ParsedArgs {
       continue;
     }
     if (arg === "--auth") {
-      args.auth = expectEnum(argv[++i], ["none", "bearer", "api-key"], "--auth");
+      args.auth = expectEnum(
+        argv[++i],
+        ["none", "bearer", "bearer-jwt", "api-key"],
+        "--auth",
+      );
       continue;
     }
     if (arg === "--no-docker") {
