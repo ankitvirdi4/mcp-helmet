@@ -31,7 +31,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "mcp-helmet": "./dist/cli.js"
+    "mcp-helmet": "dist/cli.js"
   },
   "exports": {
     ".": {

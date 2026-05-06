@@ -13,6 +13,8 @@
 npm install mcp-helmet @modelcontextprotocol/sdk zod
 ```
 
+> **Alpha note.** Until `0.1.0` stable cuts, the `latest` dist-tag points at the most recent alpha (currently `0.1.0-alpha.7`). `npm install mcp-helmet` resolves there; pin a specific version if you prefer to opt out of alpha churn. Once the [ROADMAP](./ROADMAP.md) gates clear, `latest` moves to the stable release.
+
 > **Peer dependencies:** `@modelcontextprotocol/sdk` ^1.29.0, `zod` ^3.22.0 or ^3.25 (v4). `zod-to-json-schema` is an optional peer for Zod v3 users.
 
 ## Quickstart
