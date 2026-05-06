@@ -1,6 +1,6 @@
 {
   "name": "mcp-helmet",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "Production middleware for MCP servers. Auto transport, content wrapping, health checks, graceful shutdown, auth, rate limiting, structured request logging. Wraps the official Model Context Protocol SDK.",
   "license": "MIT",
   "author": "Ankit Virdi <ankitvirdi4@gmail.com> (https://github.com/ankitvirdi4)",

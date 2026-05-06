@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- Pre-stable hardening cycle. No new features; preparing for `0.1.0` stable.
+
+  ### Added
+
+  - **Stdio path subprocess test.** `src/mcp-server.stdio.test.ts` spawns a fixture server via `StdioClientTransport`, completes an MCP `initialize` / `listTools` / `callTool` round trip, and asserts that `console.log` / `console.info` / `console.debug` from inside a tool handler are redirected to stderr. Closes the stdio coverage gap. The redirect itself runs in the spawned child where vitest's coverage instrumentation cannot reach, so `mcp-server.ts` line coverage stays at ~80% — that gap is now an instrumentation artifact, not a real one.
+  - **Scaffolder generates test file + CI workflow.** `npx mcp-helmet init` now produces `src/server.ts` (config) and `src/index.ts` (start) as separate files, plus `src/server.test.ts` (vitest + `InMemoryTransport`, two passing tests against the `greet` tool), `vitest.config.ts`, and `.github/workflows/ci.yml` (typecheck + test + build on push and PR). Two new opt-out flags: `--no-tests` and `--no-ci`.
+  - **`--auth bearer-jwt` preset.** New value for the `--auth` flag. Generates a real JWT verifier built on [`jose`](https://github.com/panva/jose): JWKS via `JWKS_URL`, shared HMAC via `JWT_SECRET`, optional `JWT_ISSUER` / `JWT_AUDIENCE` checks. Adds `jose` to scaffolded dependencies. Generated README has an Auth (JWT) section with a working `curl` example.
+  - **Benchmark harness.** `benchmarks/bench.ts` drives a real listening server with `StreamableHTTPClientTransport`, runs five scenarios (bare, +requestLog, +bearerAuth, +rateLimiter, full stack), reports p50 / p95 / p99 / mean latency and req/s as a markdown table. Pre-warms JIT across all scenarios so the first measurement is not biased. `npm run bench`. Sanity gate: exits non-zero if full-stack mean exceeds 5x bare baseline.
+
+  ### Changed
+
+  - **README** gains a Performance section (real numbers from the benchmark harness; full-stack overhead currently 0.98x bare, ie below the noise floor at this scale), a Migrate-from-raw-SDK section with side-by-side before/after, and a Troubleshooting section covering six common questions.
+  - **CONTRIBUTING** adds the bench script and a contributor checklist for new middleware (test coverage, integration test, bench entry, README section, scaffolder branch).
+  - **mcp-fake-readme** reconciled with shipped reality: scaffolder section lists `bearer-jwt` and `--no-tests` / `--no-ci`, scaffold description mentions the generated test and CI workflow.
+
+  ### Notes
+
+  - 155 tests, all green (+1 from the bearer-jwt preset CLI test, +2 from the stdio subprocess test, +5 from the scaffolder refactor and opt-outs).
+  - End-to-end smoke verified: scaffold with `--auth bearer-jwt --transport http` → install local tarball → typecheck → test → build → start → 401 on no auth → 401 on invalid bearer → 200 on a valid HS256-signed JWT.
+  - Burn-in window starts at this release. Watching for any regression for 7-14 days before promoting to `0.1.0` stable per the gates in `ROADMAP.md`.
+
 ## 0.1.0-alpha.5
 
 ### Minor Changes
