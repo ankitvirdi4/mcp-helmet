@@ -109,7 +109,7 @@ We audited 30 production MCP servers and 320 GitHub issues across the official S
 - ✅ `npx mcp-helmet init` CLI scaffolder + Docker template
 - ✅ `examples/` directory with three runnable scenarios
 
-v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage. v0.2 is on the [ROADMAP](./CHANGELOG.md): Redis-backed session store, structured logging middleware, Python port via FastMCP plugin.
+v0.1.0 stable will follow once the alpha cycle has 30+ days of real-world usage and a small set of confirmed users. The full plan, including v0.2 scope, gates, forcing events, and a kill switch, lives in [ROADMAP.md](./ROADMAP.md).
 
 ## How it relates to the official SDK
 

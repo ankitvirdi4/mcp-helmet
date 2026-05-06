@@ -16,7 +16,6 @@ npm-debug.log*
 .claude/
 
 # Internal planning, never published
-ROADMAP.md
 CLAUDE.md
 NOTES.md
 TODO.md
