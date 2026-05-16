@@ -192,6 +192,20 @@ The toolkit detects which Zod major you have and adapts at runtime. If you are o
 **`StreamableHTTPClientTransport` returns 401.**
 You have an auth middleware in the chain. Pass the right `Authorization` header in `requestInit.headers` when constructing the client transport. See [`examples/02-http-bearer-rate-limit.ts`](./examples/02-http-bearer-rate-limit.ts).
 
+**Testing a tool that calls `getAuthContext()`.**
+`InMemoryTransport` bypasses the HTTP request lifecycle, which is the layer that normally wraps each request with `runWithAuthContext`. So tools that read the auth principal via `getAuthContext()` return `undefined` under in-memory tests by default. Inject auth manually by wrapping the `callTool` invocation:
+
+```typescript
+import { runWithAuthContext } from "mcp-helmet";
+
+const result = await runWithAuthContext(
+  { user: "test-user", scopes: ["read", "write"] },
+  () => client.callTool({ name: "whoami", arguments: {} }),
+);
+```
+
+This is the pattern used in [`mcp-helmet-fs-example`](https://github.com/ankitvirdi4/mcp-helmet-fs-example/blob/main/src/server.test.ts) to test scope-based authorization without going through HTTP.
+
 ## How it relates to the official SDK
 
 `mcp-helmet` is **not** a fork, an alternative, or a replacement. It's a convenience layer.

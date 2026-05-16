@@ -28,3 +28,69 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  bin-smoke:
+    # End-to-end check of the published-tarball install path. This catches the
+    # regression shape that shipped in 0.1.0-alpha.3 through 0.1.0-alpha.6
+    # (the bin's direct-invoke check evaluated false when called via the
+    # symlinked node_modules/.bin/mcp-helmet, so `npx mcp-helmet init`
+    # silently no-op'd). The in-repo Vitest suite never tripped over it
+    # because it runs `node dist/cli.js` directly, not via the bin symlink.
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install + build (produce dist/)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Pack the tarball
+        id: pack
+        run: |
+          TARBALL=$(npm pack --silent)
+          echo "tarball=$PWD/$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Install tarball in a fresh directory
+        run: |
+          mkdir -p /tmp/bin-smoke
+          cd /tmp/bin-smoke
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund "${{ steps.pack.outputs.tarball }}"
+          # Sanity-check the bin was actually wired.
+          test -e ./node_modules/.bin/mcp-helmet
+          ./node_modules/.bin/mcp-helmet --version
+
+      - name: Scaffold a project via the bin
+        run: |
+          cd /tmp/bin-smoke
+          ./node_modules/.bin/mcp-helmet init smoke-project \
+            --transport http \
+            --auth bearer-jwt
+          # The scaffolder prints "Created..." on success; verify the dir
+          # was actually created.
+          test -d smoke-project/src
+          test -f smoke-project/src/server.ts
+          test -f smoke-project/src/index.ts
+          test -f smoke-project/src/server.test.ts
+          test -f smoke-project/vitest.config.ts
+          test -f smoke-project/.github/workflows/ci.yml
+          test -f smoke-project/Dockerfile
+
+      - name: Scaffolded project installs, typechecks, tests, builds
+        run: |
+          cd /tmp/bin-smoke/smoke-project
+          # Re-point mcp-helmet at the local tarball so we test against the
+          # version we just packed, not the npm-registry latest.
+          npm install --no-audit --no-fund "${{ steps.pack.outputs.tarball }}"
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run test:run
+          npm run build
